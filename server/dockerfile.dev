@@ -4,4 +4,4 @@ WORKDIR /app
 COPY package.json package.json
 RUN npm install
 EXPOSE 5000
-CMD ["npm","start"]
+CMD ["npm","test"]

@@ -16,7 +16,7 @@ services:
   node:
     build: 
       context: ../server
-      dockerfile: dockerfile.dev
+      dockerfile: dockerfile
     ports:
       - "5000:5000"
     volumes:
