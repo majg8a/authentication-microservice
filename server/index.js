@@ -2,19 +2,25 @@ const credentialsModel = require("./models/credentialsModel");
 const sequelize = require("./scripts/sequilize");
 const bcrypt = require("bcrypt");
 const app = require("express")();
+const bodyParser = require("body-parser");
 const port = process.env.PORT || 5000;
+
+app.use(bodyParser.json());
 
 async function main() {
   try {
     await sequelize.authenticate();
     console.log("Connection has been established successfully.");
+    await credentialsModel.sync();
+    console.log("tables synced");
   } catch (error) {
     console.error("Unable to connect to the database:", error);
   }
 }
 main();
 
-app.post("save-credentials", async (req, res) => {
+app.post("/save-credentials", async (req, res) => {
+  console.log(req.body);
   const { user, password } = req.body;
   if (!user) {
     res.status(400).json({ error: "missing user" });
@@ -27,15 +33,16 @@ app.post("save-credentials", async (req, res) => {
   try {
     const credentials = await credentialsModel.create({
       user: String(user).toLowerCase(),
-      password: await bcrypt.hash(password),
+      password: await bcrypt.hash(password, 10),
     });
     res.json({ message: `user ${credentials.user} created successfully` });
   } catch (error) {
+    console.error(error);
     res.status(500).send(error);
   }
 });
 
-app.post("login", async (req, res) => {
+app.post("/login", async (req, res) => {
   const { user, password } = req.body;
   if (!user) {
     res.status(400).json({ error: "missing user" });
@@ -61,7 +68,7 @@ app.post("login", async (req, res) => {
     }
 
     const { id } = credentials;
-    const token = await bcrypt.hash(new Date());
+    const token = await bcrypt.hash(new Date().toString(), 10);
 
     await credentialsModel.update(
       {
@@ -77,7 +84,7 @@ app.post("login", async (req, res) => {
   }
 });
 
-app.post("verify", async (req, res) => {
+app.post("/verify", async (req, res) => {
   const { token } = req.body;
   if (!token) {
     res.status(400).json({ error: "token invalid" });
@@ -100,7 +107,7 @@ app.post("verify", async (req, res) => {
   }
 });
 
-app.post("logout", async (req, res) => {
+app.post("/logout", async (req, res) => {
   const { token } = req.body;
   if (!token) {
     res.status(400).json({ error: "token invalid" });
@@ -126,7 +133,7 @@ app.post("logout", async (req, res) => {
   }
 });
 
-app.post("change-password", async (req, res) => {
+app.post("/change-password", async (req, res) => {
   const { token, password, newPassword } = req.body;
   if (!token) {
     res.status(400).json({ error: "token invalid" });
@@ -146,15 +153,20 @@ app.post("change-password", async (req, res) => {
       return;
     }
     const { id } = credentials;
-    credentialsModel.update(
+    await credentialsModel.update(
       {
-        password: await bcrypt.hash(newPassword),
+        password: await bcrypt.hash(newPassword, 10),
       },
       { where: { id } }
     );
+    res.send({message:"password changed successfully"})
   } catch (error) {
     res.status(500).send(error);
   }
+});
+
+app.get("/", () => {
+  console.log("ayuda diosmio por favor");
 });
 
 app.listen(port, () => {
