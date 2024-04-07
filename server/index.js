@@ -1,11 +1,14 @@
 const credentialsModel = require("./models/credentialsModel");
 const sequelize = require("./scripts/sequilize");
 const bcrypt = require("bcrypt");
+const jwt = require('jsonwebtoken');
+const { Op } = require('sequelize');
 const app = require("express")();
 const bodyParser = require("body-parser");
 const port = process.env.PORT || 5000;
 
 app.use(bodyParser.json());
+
 
 async function main() {
   try {
@@ -31,79 +34,96 @@ app.post("/save-credentials", async (req, res) => {
     return;
   }
   try {
-    const credentials = await credentialsModel.create({
-      user: String(user).toLowerCase(),
-      password: await bcrypt.hash(password, 10),
+    const [credentials, isNew] = await credentialsModel.findOrCreate({
+      where: {
+        user: String(user).toLowerCase(),
+      }, defaults: {
+        user: String(user).toLowerCase(),
+        password: await bcrypt.hash(password, 10),
+      }
     });
-    res.json({ message: `user ${credentials.user} created successfully` });
+
+    if (!isNew) {
+      return res.status(200).json({message: 'user already exist'})
+    }
+    return res.json({ message: `user ${credentials.user} created successfully` });
   } catch (error) {
     console.error(error);
-    res.status(500).send(error);
+    return res.status(500).send(error);
   }
 });
 
-app.post("/login", async (req, res) => {
-  const { user, password } = req.body;
-  if (!user) {
-    res.status(400).json({ error: "missing user" });
-    return;
-  }
-  if (!password) {
-    res.status(400).json({ error: "missing user" });
-    return;
-  }
-
+app.post('/login', async (req, res) => {
   try {
-    const credentials = await credentialsModel.findOne({
-      where: { user: String(user).toLowerCase() },
+    const { user, password } = req.body;
+
+    if (!user) {
+      res.status(400).json({ error: "missing user" });
+      return;
+    }
+    if (!password) {
+      res.status(400).json({ error: "missing user" });
+      return;
+    }
+
+    // Buscar el usuario en la base de datos
+    const userData = await credentialsModel.findOne({
+      where: { user },
     });
-    if (!credentials) {
-      res.status(400).send({ error: "user not found" });
-      return;
-    }
-    const isPassword = await bcrypt.compare(password, credentials.password);
-    if (!isPassword) {
-      res.status(401).send({ error: "password is not valid" });
-      return;
+
+    if (!userData) {
+      return res.status(401).send('Usuario no encontrado');
     }
 
-    const { id } = credentials;
-    const token = await bcrypt.hash(new Date().toString(), 10);
+    // Verificar la contraseña
+    const isPasswordValid = await bcrypt.compare(password, userData.password);
 
-    await credentialsModel.update(
-      {
-        token,
-        tokenBirth: new Date(),
-      },
-      { where: { id } }
-    );
+    if (!isPasswordValid) {
+      return res.status(401).send('Contraseña incorrecta');
+    }
 
-    res.send({ token });
+    // Generar un token JWT
+    const token = jwt.sign({ user }, 'secretKey', { expiresIn: '1h' });
+
+    const updated = await credentialsModel.update({
+      token: token
+    }, {
+      where: {
+        user: user
+      }
+    })
+
+    return res.json({ token });
   } catch (error) {
-    res.status(500).send(error);
+    console.error(error);
+    return res.status(500).send('Error al iniciar sesión');
   }
 });
 
-app.post("/verify", async (req, res) => {
+
+app.post('/verify', async (req, res) => {
   const { token } = req.body;
-  if (!token) {
-    res.status(400).json({ error: "token invalid" });
-    return;
-  }
 
   try {
-    const credentials = await credentialsModel.findOne({
+    // Buscar el usuario en la base de datos por el token
+    const userData = await credentialsModel.findOne({
       where: { token },
     });
-    if (!credentials) {
-      res.status(400).send({ verify: false });
-      return;
+
+    if (!userData) {
+      return res.json(false);
     }
-    res.send({
-      verify: true,
+
+    jwt.verify(token, 'secretKey', (err, decoded) => {
+      if (err) {
+        return res.json(false);
+      } else {
+        return res.json(true);
+      }
     });
   } catch (error) {
-    res.status(500).send(error);
+    console.error(error);
+    return res.status(500).send('Error al verificar el token');
   }
 });
 
@@ -125,11 +145,9 @@ app.post("/logout", async (req, res) => {
       res.status(400).send({ error: "user not found" });
       return;
     }
-    res.send({
-      message: "logout successfully",
-    });
+    return res.send({ message: "logout successfully"});
   } catch (error) {
-    res.status(500).send(error);
+    return res.status(500).send(error);
   }
 });
 
@@ -159,9 +177,9 @@ app.post("/change-password", async (req, res) => {
       },
       { where: { id } }
     );
-    res.send({message:"password changed successfully"})
+    return res.send({message:"password changed successfully"})
   } catch (error) {
-    res.status(500).send(error);
+    return res.status(500).send(error);
   }
 });
 
