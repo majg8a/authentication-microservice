@@ -126,7 +126,7 @@ app.post('/verify', async (req, res) => {
       return res.json(false);
     }
 
-    jwt.verify(token, 'secretKey', (err, decoded) => {
+    jwt.verify(token, config.jwt_key.key, (err, decoded) => {
       if (err) {
         return res.json(false);
       } else {
