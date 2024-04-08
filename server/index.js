@@ -5,7 +5,8 @@ const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 const app = require("express")();
 const bodyParser = require("body-parser");
-const cors = require('cors')
+const cors = require('cors');
+const config = require("./config");
 const port = process.env.PORT || 5000;
 
 app.use(bodyParser.json());
@@ -94,7 +95,7 @@ app.post('/login', async (req, res) => {
     }
 
     // Generar un token JWT
-    const token = jwt.sign({ user }, 'secretKey', { expiresIn: '1h' });
+    const token = jwt.sign({ user }, config.jwt_key.key, { expiresIn: '1h' });
 
     const updated = await credentialsModel.update({
       token: token
@@ -114,7 +115,7 @@ app.post('/login', async (req, res) => {
 
 app.post('/verify', async (req, res) => {
   const { token } = req.body;
-
+  console.log('prueba');
   try {
     // Buscar el usuario en la base de datos por el token
     const userData = await credentialsModel.findOne({
