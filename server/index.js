@@ -5,10 +5,21 @@ const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 const app = require("express")();
 const bodyParser = require("body-parser");
+const cors = require('cors')
 const port = process.env.PORT || 5000;
 
 app.use(bodyParser.json());
 
+const corsOptions = {
+  credentials: true,
+  optionSuccessStatus: 200,
+  headers: 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
+  allowedHeaders: '*',
+  origin: '*',
+  methods: ['GET', 'POST']
+}
+
+app.use(cors(corsOptions));
 
 async function main() {
   try {
